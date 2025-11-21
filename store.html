@@ -22,10 +22,96 @@
       width: 100%;
       height: 100%;
     }
+
+    #controls-menu {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(10px);
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-radius: 12px;
+      padding: 16px 32px;
+      color: white;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      display: flex;
+      gap: 24px;
+      align-items: center;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      transition: opacity 0.3s ease;
+      z-index: 1000;
+    }
+
+    #controls-menu.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .control-label {
+      font-size: 14px;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .keys {
+      display: flex;
+      gap: 6px;
+    }
+
+    .key {
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.15), rgba(255, 255, 255, 0.05));
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: white;
+      min-width: 32px;
+      text-align: center;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    .divider {
+      width: 1px;
+      height: 32px;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .instruction {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.7);
+      font-style: italic;
+    }
   </style>
 </head>
 <body>
   <div id="canvas-container"></div>
+
+  <div id="controls-menu">
+    <div class="control-group">
+      <span class="control-label">Move:</span>
+      <div class="keys">
+        <span class="key">↑</span>
+        <span class="key">↓</span>
+        <span class="key">←</span>
+        <span class="key">→</span>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="control-group">
+      <span class="control-label">Look:</span>
+      <span class="key">MOUSE</span>
+    </div>
+    <div class="divider"></div>
+    <span class="instruction">Click to start exploring</span>
+  </div>
 
   <script type="importmap">
     {
@@ -104,10 +190,14 @@
 
     controls.addEventListener('lock', () => {
       console.log('Controls locked - use Arrow Keys to move, mouse to look around');
+      // Hide the controls menu when user starts exploring
+      document.getElementById('controls-menu').classList.add('hidden');
     });
 
     controls.addEventListener('unlock', () => {
       console.log('Controls unlocked - click to re-enter');
+      // Show the controls menu again when user exits
+      document.getElementById('controls-menu').classList.remove('hidden');
     });
 
     scene.add(controls.getObject());
