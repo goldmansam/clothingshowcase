@@ -623,6 +623,7 @@
     let clothingConfigs = []; // Will be populated during loading
     const ROTATION_DURATION = 200; // Frames for 360° rotation
     const DISPLAY_DURATION = 150; // Frames to display after rotation
+    const itemsPresentedThisCycle = new Set(); // Track which items have been presented this cycle
 
     function animate() {
       requestAnimationFrame(animate);
@@ -658,41 +659,40 @@
         const speed = 0.05;
         const spacing = 0.2;
 
-        // Check if any item is at the front center position (x: 0, z: 20)
+        // Check if any item should trigger presentation (when entering segment 5->0 transition)
         if (presentationPhase === 'moving') {
-          // Debug log positions
-          if (Math.random() < 0.02) {
-            console.log('=== Position Check ===');
-            clothingModels.forEach((item, index) => {
-              console.log(`Item ${index}: x=${item.container.position.x.toFixed(2)}, z=${item.container.position.z.toFixed(2)}`);
-            });
-          }
-
           clothingModels.forEach((item, index) => {
-            // Check if item is at the front center waypoint
-            const absX = Math.abs(item.container.position.x);
-            const z = item.container.position.z;
-            const isAtFrontCenter = absX < 1.5 && z > 18 && z < 21;
+            // Calculate where this item is on the path
+            const activeTime = time;
+            const progress = ((activeTime * speed) + (index * spacing)) % 1;
+            const totalSegments = pathWaypoints.length;
+            const segmentProgress = progress * totalSegments;
+            const currentSegment = Math.floor(segmentProgress);
+            const segmentT = segmentProgress - currentSegment;
 
-            // Trigger presentation when item reaches front center
-            if (isAtFrontCenter) {
-              console.log(`✓✓✓ TRIGGERED: Item ${index} (${item.filename}) at x=${item.container.position.x.toFixed(2)}, z=${z.toFixed(2)}`);
-              // Pause and present this item
+            // Trigger when item enters the last segment (5) and is close to waypoint 0
+            // This means it's approaching the front center position (x=0, z=20)
+            const isInLastSegment = (currentSegment === totalSegments - 1);
+            const isNearTransition = (segmentT > 0.8); // Close to completing the segment
+
+            // Check if this item hasn't been presented this cycle
+            const itemKey = `${index}_${Math.floor(activeTime / (1/speed))}`;
+
+            if (isInLastSegment && isNearTransition && !itemsPresentedThisCycle.has(index)) {
+              console.log(`🎯 TRIGGERING item ${index} (${item.filename}) - segment ${currentSegment}, segmentT ${segmentT.toFixed(3)}`);
+
               presentationPhase = 'rotating';
               pathPauseTime = time;
               presentingItemIndex = index;
               rotationStartAngle = item.container.rotation.y;
               rotationTimer = 0;
+              itemsPresentedThisCycle.add(index);
 
-              // Show info card
               const info = clothingInfo[item.filename];
               if (info) {
-                console.log(`Info:`, info);
                 document.getElementById('card-title').textContent = info.title;
                 document.getElementById('card-inspiration').textContent = info.inspiration;
                 document.getElementById('info-card').classList.add('visible');
-              } else {
-                console.error(`No info found for ${item.filename}`);
               }
             }
           });
@@ -750,6 +750,13 @@
             // Resume movement
             document.getElementById('info-card').classList.remove('visible');
             presentationPhase = 'moving';
+
+            // Clear the presented flag for this item if all items have been presented
+            if (itemsPresentedThisCycle.size >= 5) {
+              itemsPresentedThisCycle.clear();
+              console.log('🔄 All items presented - clearing cycle tracker');
+            }
+
             presentingItemIndex = -1;
             // Skip ahead slightly to avoid immediate re-trigger
             time = pathPauseTime + 0.2;
