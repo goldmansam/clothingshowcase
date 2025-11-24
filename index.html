@@ -670,13 +670,15 @@
             const currentSegment = Math.floor(segmentProgress);
             const segmentT = segmentProgress - currentSegment;
 
+            // Debug log every 2 seconds for item 0
+            if (index === 0 && Math.floor(time * 10) % 20 === 0) {
+              console.log(`Item 0: segment ${currentSegment}, segmentT ${segmentT.toFixed(3)}, pos (${item.container.position.x.toFixed(1)}, ${item.container.position.z.toFixed(1)})`);
+            }
+
             // Trigger when item enters the last segment (5) and is close to waypoint 0
             // This means it's approaching the front center position (x=0, z=20)
             const isInLastSegment = (currentSegment === totalSegments - 1);
             const isNearTransition = (segmentT > 0.8); // Close to completing the segment
-
-            // Check if this item hasn't been presented this cycle
-            const itemKey = `${index}_${Math.floor(activeTime / (1/speed))}`;
 
             if (isInLastSegment && isNearTransition && !itemsPresentedThisCycle.has(index)) {
               console.log(`🎯 TRIGGERING item ${index} (${item.filename}) - segment ${currentSegment}, segmentT ${segmentT.toFixed(3)}`);
