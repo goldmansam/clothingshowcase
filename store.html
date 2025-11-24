@@ -267,34 +267,34 @@
     // Path creation for clothing movement
     const pathWaypoints = [
       {
-        "x": 4.160000000000002,
+        "x": 0,
         "y": 0.5,
-        "z": 20.74000000000004
+        "z": 20
       },
       {
-        "x": 5.600000000000003,
+        "x": 6,
         "y": 0.5,
-        "z": 11.460000000000138
+        "z": 10
       },
       {
-        "x": 5.600000000000003,
+        "x": 6,
         "y": 0.5,
-        "z": -6.939999999999876
+        "z": -10
       },
       {
-        "x": -6.882263669116063,
+        "x": 0,
         "y": 0.5,
-        "z": -7.154228136959438
+        "z": -20
       },
       {
-        "x": -6.7633441334354165,
+        "x": -6,
         "y": 0.5,
-        "z": 11.405390882407119
+        "z": -10
       },
       {
-        "x": -6.146900413094533,
+        "x": -6,
         "y": 0.5,
-        "z": 21.028412850931645
+        "z": 10
       }
     ];
     const waypointMarkers = [];
@@ -658,15 +658,25 @@
         const speed = 0.05;
         const spacing = 0.2;
 
-        // Check if any item is crossing in front of camera (x close to 0, z close to camera)
+        // Check if any item is at the front center position (x: 0, z: 20)
         if (presentationPhase === 'moving') {
-          clothingModels.forEach((item, index) => {
-            const cameraZ = window.cameraStartZ || 20;
-            const dx = Math.abs(item.container.position.x - 0); // Distance from center x
-            const dz = Math.abs(item.container.position.z - cameraZ); // Distance from camera z
+          // Debug log positions
+          if (Math.random() < 0.02) {
+            console.log('=== Position Check ===');
+            clothingModels.forEach((item, index) => {
+              console.log(`Item ${index}: x=${item.container.position.x.toFixed(2)}, z=${item.container.position.z.toFixed(2)}`);
+            });
+          }
 
-            // Check if item is passing through the front-center viewing area
-            if (dx < 2 && dz < 3) {
+          clothingModels.forEach((item, index) => {
+            // Check if item is at the front center waypoint
+            const absX = Math.abs(item.container.position.x);
+            const z = item.container.position.z;
+            const isAtFrontCenter = absX < 1.5 && z > 18 && z < 21;
+
+            // Trigger presentation when item reaches front center
+            if (isAtFrontCenter) {
+              console.log(`✓✓✓ TRIGGERED: Item ${index} (${item.filename}) at x=${item.container.position.x.toFixed(2)}, z=${z.toFixed(2)}`);
               // Pause and present this item
               presentationPhase = 'rotating';
               pathPauseTime = time;
@@ -677,9 +687,12 @@
               // Show info card
               const info = clothingInfo[item.filename];
               if (info) {
+                console.log(`Info:`, info);
                 document.getElementById('card-title').textContent = info.title;
                 document.getElementById('card-inspiration').textContent = info.inspiration;
                 document.getElementById('info-card').classList.add('visible');
+              } else {
+                console.error(`No info found for ${item.filename}`);
               }
             }
           });
