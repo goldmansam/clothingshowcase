@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Clothing Store Showcase</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <style>
     * {
       margin: 0;
@@ -13,7 +16,7 @@
 
     body {
       background: #000;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: 'Work Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       overflow: hidden;
       height: 100vh;
     }
@@ -89,6 +92,55 @@
       color: rgba(255, 255, 255, 0.7);
       font-style: italic;
     }
+
+    #info-card {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(255, 255, 255, 0.1);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 32px 40px;
+      max-width: 500px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+      z-index: 1000;
+      text-align: center;
+    }
+
+    #info-card.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    #info-card h2 {
+      color: white;
+      font-size: 32px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      letter-spacing: 0.5px;
+    }
+
+    #info-card .inspiration {
+      color: rgba(255, 255, 255, 0.9);
+      font-size: 16px;
+      line-height: 1.6;
+      margin-bottom: 20px;
+      font-weight: 400;
+    }
+
+    #info-card .role {
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 14px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
   </style>
 </head>
 <body>
@@ -111,6 +163,12 @@
     </div>
     <div class="divider"></div>
     <span class="instruction">Click to start exploring</span>
+  </div>
+
+  <div id="info-card">
+    <h2 id="card-title"></h2>
+    <p class="inspiration" id="card-inspiration"></p>
+    <p class="role">Role: Designer</p>
   </div>
 
   <script type="importmap">
@@ -519,7 +577,8 @@
             baseY: config.position.y,
             phase: index * 0.5,
             pathRadius: pathRadius,
-            startAngle: startAngle
+            startAngle: startAngle,
+            filename: config.file
           });
 
           console.log(`Loaded ${config.file} - pathRadius: ${pathRadius.toFixed(2)}, startAngle: ${startAngle.toFixed(2)}`);
@@ -529,6 +588,41 @@
 
     // Animation
     let time = 0;
+
+    // Presentation mode variables
+    const clothingInfo = {
+      'Love (Final).gltf': {
+        title: 'Love',
+        inspiration: 'Inspired by the famous Love Statue found on the University of Pennsylvania campus'
+      },
+      'Pink Floyd (Final).gltf': {
+        title: 'Pink Floyd',
+        inspiration: 'The band logo bears resemblance to the fraternity logo, and Pink Floyd music is used in theme songs'
+      },
+      'Purple Crown (Final).gltf': {
+        title: 'Purple Crown',
+        inspiration: 'Inspired by sports team logos featuring royalty colors and regal symbolism'
+      },
+      'Skyline Final.gltf': {
+        title: 'Skyline',
+        inspiration: 'Celebrating the iconic Philadelphia skyline and city architecture'
+      },
+      'Yellow Brick (final).gltf': {
+        title: 'Yellow Brick',
+        inspiration: 'Inspired by The Wizard of Oz, paying homage to the fraternity name OZ'
+      }
+    };
+
+    let presentationMode = true;
+    let presentationPhase = 'moving'; // 'moving', 'rotating', 'displaying'
+    let rotationStartAngle = 0;
+    let rotationTimer = 0;
+    let displayTimer = 0;
+    let pathPauseTime = 0;
+    let presentingItemIndex = -1;
+    let clothingConfigs = []; // Will be populated during loading
+    const ROTATION_DURATION = 200; // Frames for 360° rotation
+    const DISPLAY_DURATION = 150; // Frames to display after rotation
 
     function animate() {
       requestAnimationFrame(animate);
@@ -560,45 +654,125 @@
       }
 
       // Animate clothing items
-      clothingModels.forEach((item, index) => {
-        const floatAmount = Math.sin(time + item.phase) * 0.1;
-        item.container.position.y = item.baseY + floatAmount;
+      if (presentationMode && clothingModels.length === 5 && pathWaypoints.length >= 2) {
+        const speed = 0.05;
+        const spacing = 0.2;
 
-        // If path waypoints exist, follow the path
-        if (pathWaypoints.length >= 2) {
-          const speed = 0.05; // Speed along path
-          const spacing = 0.2; // Spacing between items (0-1 range)
+        // Check if any item is crossing in front of camera (x close to 0, z close to camera)
+        if (presentationPhase === 'moving') {
+          clothingModels.forEach((item, index) => {
+            const cameraZ = window.cameraStartZ || 20;
+            const dx = Math.abs(item.container.position.x - 0); // Distance from center x
+            const dz = Math.abs(item.container.position.z - cameraZ); // Distance from camera z
 
-          // Calculate position along path (0 to 1)
-          const progress = ((time * speed) + (index * spacing)) % 1;
+            // Check if item is passing through the front-center viewing area
+            if (dx < 2 && dz < 3) {
+              // Pause and present this item
+              presentationPhase = 'rotating';
+              pathPauseTime = time;
+              presentingItemIndex = index;
+              rotationStartAngle = item.container.rotation.y;
+              rotationTimer = 0;
 
-          // Calculate which segment and position within that segment
+              // Show info card
+              const info = clothingInfo[item.filename];
+              if (info) {
+                document.getElementById('card-title').textContent = info.title;
+                document.getElementById('card-inspiration').textContent = info.inspiration;
+                document.getElementById('info-card').classList.add('visible');
+              }
+            }
+          });
+        }
+
+        // Update all items
+        clothingModels.forEach((item, index) => {
+          const floatAmount = Math.sin(time + item.phase) * 0.1;
+          item.container.position.y = item.baseY + floatAmount;
+
+          // Use frozen time during presentation, normal time when moving
+          const activeTime = (presentationPhase === 'moving') ? time : pathPauseTime;
+          const progress = ((activeTime * speed) + (index * spacing)) % 1;
           const totalSegments = pathWaypoints.length;
           const segmentProgress = progress * totalSegments;
           const currentSegment = Math.floor(segmentProgress);
           const segmentT = segmentProgress - currentSegment;
 
-          // Get start and end waypoints (loop back to start)
           const start = pathWaypoints[currentSegment % totalSegments];
           const end = pathWaypoints[(currentSegment + 1) % totalSegments];
 
-          // Interpolate position
           item.container.position.x = start.x + (end.x - start.x) * segmentT;
           item.container.position.z = start.z + (end.z - start.z) * segmentT;
 
-          // Face direction of movement
-          const dx = end.x - start.x;
-          const dz = end.z - start.z;
-          const baseRotation = Math.atan2(dx, dz);
+          // Handle rotation
+          if (index === presentingItemIndex && (presentationPhase === 'rotating' || presentationPhase === 'displaying')) {
+            // This item is being presented - rotate it
+            if (presentationPhase === 'rotating') {
+              rotationTimer++;
+              const rotationProgress = Math.min(rotationTimer / ROTATION_DURATION, 1);
+              item.container.rotation.y = rotationStartAngle + (rotationProgress * Math.PI * 2);
 
-          // Add 180-degree rotation along the path (full rotation per complete path loop)
-          const additionalRotation = progress * Math.PI * 2; // Full 360-degree rotation per loop
-          item.container.rotation.y = baseRotation + additionalRotation;
-        } else {
-          // No path - just rotate in place
-          item.container.rotation.y += 0.005;
+              if (rotationProgress >= 1) {
+                presentationPhase = 'displaying';
+                displayTimer = 0;
+              }
+            } else {
+              // Keep final rotation during display
+              item.container.rotation.y = rotationStartAngle + Math.PI * 2;
+            }
+          } else {
+            // Normal rotation based on path direction
+            const dx = end.x - start.x;
+            const dz = end.z - start.z;
+            const baseRotation = Math.atan2(dx, dz);
+            const additionalRotation = progress * Math.PI * 2;
+            item.container.rotation.y = baseRotation + additionalRotation;
+          }
+        });
+
+        // Handle display phase timer
+        if (presentationPhase === 'displaying') {
+          displayTimer++;
+          if (displayTimer > DISPLAY_DURATION) {
+            // Resume movement
+            document.getElementById('info-card').classList.remove('visible');
+            presentationPhase = 'moving';
+            presentingItemIndex = -1;
+            // Skip ahead slightly to avoid immediate re-trigger
+            time = pathPauseTime + 0.2;
+          }
         }
-      });
+      } else {
+        // Fallback: original animation without presentation
+        clothingModels.forEach((item, index) => {
+          const floatAmount = Math.sin(time + item.phase) * 0.1;
+          item.container.position.y = item.baseY + floatAmount;
+
+          if (pathWaypoints.length >= 2) {
+            const speed = 0.05;
+            const spacing = 0.2;
+            const progress = ((time * speed) + (index * spacing)) % 1;
+            const totalSegments = pathWaypoints.length;
+            const segmentProgress = progress * totalSegments;
+            const currentSegment = Math.floor(segmentProgress);
+            const segmentT = segmentProgress - currentSegment;
+
+            const start = pathWaypoints[currentSegment % totalSegments];
+            const end = pathWaypoints[(currentSegment + 1) % totalSegments];
+
+            item.container.position.x = start.x + (end.x - start.x) * segmentT;
+            item.container.position.z = start.z + (end.z - start.z) * segmentT;
+
+            const dx = end.x - start.x;
+            const dz = end.z - start.z;
+            const baseRotation = Math.atan2(dx, dz);
+            const additionalRotation = progress * Math.PI * 2;
+            item.container.rotation.y = baseRotation + additionalRotation;
+          } else {
+            item.container.rotation.y += 0.005;
+          }
+        });
+      }
 
       renderer.render(scene, camera);
     }
